@@ -1,0 +1,23 @@
+﻿# LEAP binaries вЂ” too big for git, snapshot manually if needed
+*.leap
+*.zip
+
+# Decrypted .leap contents вЂ” regenerable
+data/extracted/*
+!data/extracted/.gitkeep
+
+# Snapshots вЂ” track names in logs but not files
+data/snapshots/*
+!data/snapshots/.gitkeep
+
+# Logs and temp
+*.tmp
+*.log
+
+# Python / Node noise (in case)
+__pycache__/
+.venv/
+node_modules/
+
+# VS Code workspace settings (keep only shared)
+.vscode/settings.json
