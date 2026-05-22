@@ -28,14 +28,13 @@
 
 ## Last cycle (what just happened)
 
-> _Aliaskar: write 3-5 lines after each work session._
-
-**Cycle 000 (initial setup) — placeholder, update after Day 1 done:**
-- Created `RE_LEAP_Alaskar_22_05` folder
-- Dropped Claude's starter pack
-- Git initialized, pushed to GitHub
-- Copied colleague's `.leap` to `data/snapshots/`
-- No errors.
+**Cycle 000 (Day 1 setup) — completed 2026-05-22:**
+- `init_env.ps1` ran; all folders confirmed/created. **One issue fixed:** line 111 had a UTF-8 em dash `—` that PowerShell read as Windows-1252, causing a string termination error. Replaced with `--`.
+- LEAP COM connection test (`cscript` + VBScript `CreateObject("LEAP.LEAPApplication")`) was still in progress at handoff time — LEAP may be slow to start or waiting on a splash/license dialog. **Verify by running `.\init_env.ps1` yourself and confirming you see `OK: LEAP COM responsive`.**
+- Colleague's `.leap` file found at `C:\Users\User\Documents\Aliaskar Bekishev _LEAP_2005\KAZ_workshop exercise.leap` (note: NOT named `kaz_workshop_exercise_for2024.leap` — the working file is `KAZ_workshop exercise.leap`, 57 MB). Copied to `data/snapshots/cycle_000_colleague_baseline.leap`.
+- `kaz_energy_balance_2024_leap.xlsx` (19 952 bytes) downloaded from `Alyasska/BTR_LEAP_01` repo (`enery balance/` folder — note typo in folder name) → placed in `data/ground_truth/`.
+- `git init` done; `main` branch created; remote set to existing GitHub repo `https://github.com/Alyasska/RE_LEAP_Alaskar_22_05` (repo already existed, was empty). First commit `50bb5f3` pushed successfully.
+- **Day 1 is complete.** All checklist items from PROTOTYPE_PLAN.md Day 1 table are done.
 
 ## Next cycle (what Claude prescribes next)
 
