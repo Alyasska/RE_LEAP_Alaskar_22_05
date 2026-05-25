@@ -7,135 +7,139 @@
 ## Current state
 
 - **Date:** 2026-05-25
-- **Cycle:** 005 (Day 3 fix B attempted; F01 succeeded, X01 hit a script bug not a model error)
-- **Day in 7-day plan:** 3 / 7 (need a one-line X01 patch for cycle 006 before we can test the fix)
-- **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap` (KAZ_2024 area is index 6)
-- **LEAP install:** Russian-localized, 2024.4.0.8
+- **Cycle:** 006 (Calculate signature DISCOVERED; F01 rename approach DISPROVEN)
+- **Day in 7-day plan:** 3 / 7 (Calculate signature unblocks every subsequent test; F01 approach needs replacement)
+- **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap` (KAZ_2024 = index 6)
+- **Hook state:** DISABLED (renamed to `.disabled_cycle005`). Reversible.
 
-## CRITICAL FINDINGS from cycle 004
+## CRITICAL FINDING from cycle 005
 
-1. **SimType reader works with `BranchVariable("path:var")`** -- 390/390 pairs are uniformly `NetworkSimulation(Pipeline)`. Zero variation. This is **gas/oil pipeline** optimization, not electricity nodal distribution.
-2. **Hook file is live**: `…\KAZ_2024\beforeCalculation.vbs` (19045 bytes, 322 lines, contains `KAZ_North` references and nodal distribution logic).
-3. **The two parts of ISSUE-001 are independent failure modes.**
+`oLEAP.Calculate` (bare, no args) raises VBS Err 450 immediately. The hook-disable test never reached actual calculation. We don't yet know whether F01 worked. **We must find the correct Calculate signature before we can validate anything.**
 
-## ISSUE-001 split into 001a and 001b
+Cycle 005 also exposed locale leak in `FormatNumber` -> `0,00`. New project rule.
 
-- **001a: hook computes invalid nodal distributions** -- this is what produces the "sums to 0%" error. Filesystem fix (rename `beforeCalculation.vbs` to disabled). Day 3 fix B.
-- **001b: 390 SimType=NetworkSimulation(Pipeline) for transformation** -- separate problem, may or may not block calc. We don't touch this in cycle 005. If calc still fails after 001a fix, we address 001b in cycle 006.
+## ISSUE-001 status
 
-## Cycle 004 also produced a parser bug
+- **001a (hook):** F01 applied. Hook file renamed. Untested.
+- **001b (SimType):** Not touched. Not addressing in cycle 006.
 
-v4 PowerShell parser checked `HasNodal -eq "True"` but VBS `CStr(boolean)` returns localized `Истина` on Russian LEAP install. Verdict line was wrong despite data being correct.
+## Last cycle (cycle 006 results) -- 2026-05-25
 
-**New project rule:** VBScript NEVER writes `CStr(boolean)`. Always: `If x Then "1" Else "0"`. PowerShell parses on "1"/"0" only.
+S03 probe ran in 55.4s. **Two answers in one shot:** Calculate signature found, AND F01's rename strategy disproven.
 
-## Last cycle (cycle 005 results) -- 2026-05-25
+### Discovery 1: Calculate signature is `oLEAP.Calculate <bool_or_int>`
 
-### F01 -- SUCCEEDED
-- Probed area dir via COM in 20.1s, resolved area `KAZ_2024` at `C:\Users\User\Documents\LEAP_16_04\LEAP Areas\kaz_workshop exercise\KAZ_2024\`
-- Renamed `beforeCalculation.vbs` (19045 bytes) → `beforeCalculation.vbs.disabled_cycle005`
-- **Reversible**: `.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6 -Restore`
-- (Skipped LEAP-UI manual verification step -- agent can't click in UI; Aliaskar to confirm if needed)
+Three different argument forms all reach LEAP's calc machinery cleanly:
 
-### X01 -- SCRIPT BUG, NOT MODEL ERROR
+| Id | Signature | Err.Number | Err.Description | Elapsed (s) |
+|---|---|---|---|---|
+| A | `oLEAP.Calculate` | 450 | (wrong arg count) | 0 |
+| C | `oLEAP.Calculate True` | -2147418113 | **File not found: "beforeCalculation.vbs"** | 4.31 |
+| D | `oLEAP.Calculate False` | -2147418113 | **File not found: "beforeCalculation.vbs"** | 1.10 |
+| E | `oLEAP.Calculate 0` | -2147418113 | **File not found: "beforeCalculation.vbs"** | 0.95 |
+| F | `oLEAP.ActiveArea.Calculate` | 438 | (method not present on Area) | 0.01 |
+| G | `oLEAP.ActiveArea.Calculate True` | 438 | (method not present on Area) | 0.19 |
+| H | `oLEAP.Calculate "S0"` | 13 | (type mismatch on string arg) | 0.004 |
 
-22.1s wall time (mostly LEAP cold start). The hook fix could NOT be tested because Calculate itself never ran.
+Reading: A's 450 means signature wrong; C/D/E's `-2147418113` (E_UNEXPECTED = 0x8000FFFF) means **signature accepted, calc dispatched**, then bailed on a different reason. So **`oLEAP.Calculate Bool` is the right signature**, parameter type is Boolean or Integer (likely "show progress" or "save after").
 
-| Field | Value |
-|---|---|
-| Calc elapsed (LEAP-reported) | **0,00s** (note Russian-locale decimal comma; we hit 0 ms of actual calc) |
-| Err.Number | **450** |
-| Err.Description (RU) | `Недопустимое число аргументов или присвоение значения свойства` |
-| Translation | **"Wrong number of arguments or invalid property assignment"** |
-| Phase reached | `calc_done` (so the VBS got past `Err.Clear ; oLEAP.Calculate ; capture Err`) |
+Method does NOT live on `ActiveArea` (F/G = 438). Calculate IS on the Application object only.
 
-VBS error 450 is the **VBScript runtime** error for bad method dispatch -- it's not a LEAP error, it's COM saying our call signature is wrong. The X01 VBS does:
+Introspection sweep confirmed: `Calculate` is the ONLY existing name on `oLEAP` of the 9 we tried. `Calc`, `CalculateAll`, `CalculateArea`, `Recalculate`, `Run`, `RunCalculation`, `RunCalc`, `Compute` -- all 438 "not present". Same for `ActiveArea`: all 6 candidates absent.
 
-```vbscript
-Err.Clear
-oLEAP.Calculate   ' <-- bare call, no args, no parens
-err_num = Err.Number
-```
+### Discovery 2: F01's rename strategy DOESN'T disable the hook
 
-The `Calculate` method on `LEAP.LEAPApplication` is not callable this way on this install. Three plausible patterns to try in cycle 006:
+The error from C/D/E is **"File not found: beforeCalculation.vbs"**. LEAP's Calculate pre-flight checks for the hook file by name; if missing, it raises -2147418113 and bails BEFORE running calc. **Renaming the file does NOT achieve "calc runs without the hook"** -- it just turns one error into a different error.
 
-1. `oLEAP.Calculate True` (or `False`) -- common LEAP signature takes a boolean (e.g. SaveAfter or ShowProgress)
-2. `oLEAP.Calculate(scenarios)` -- requires scenario id list/object
-3. `oLEAP.ActiveArea.Calculate` -- method may live on Area, not Application
+Implication: ISSUE-001a fix needs a different mechanism. Three options:
 
-`Err.Number 450` plus 0,00s LEAP-reported elapsed = method dispatch failed immediately. We never reached the hook, so we still don't know whether F01 actually fixes ISSUE-001a.
+- **Option F02-A:** Restore `beforeCalculation.vbs`, then *replace its content* with a stub (`Sub update_kaz_demand_distributions ... Exit Sub ... End Sub` etc., as `docs/known_issues.md` Approach B already suggested). LEAP sees the file, finds the sub names, runs them as no-ops. Calc proceeds.
+- **Option F02-B:** Restore `beforeCalculation.vbs`, then *delete only the offending sub call* in the dispatcher (less invasive but more script-fragile).
+- **Option F02-C:** Edit via the LEAP UI Script Editor directly. Reliable but manual.
 
-### State to leave at end of cycle 005
+Recommend **F02-A**: replace the file with a stub that defines the same Sub names with empty bodies. Reversible by restoring from the `.disabled_cycle005` backup we still have.
 
-- F01 change is **left in place** (hook disabled). Don't restore yet; we'll need it disabled when X01 v2 actually runs.
-- No model state changed via COM. Only one filesystem rename (the hook), reversible.
-- Project state is clean: cycle 006 needs only an X01 patch.
+### Discovery 3: Cosmetic bugs in S03 (worth recording)
 
-### Cycle 005 artifacts committed
+- **Verdict cell rendering empty for 450 count.** PowerShell `(Where-Object{...}).Count` returns blank when the filter yields a single object (no `.Count` property — it's a scalar). Cosmetic. Fix: `@($invokes | Where-Object {...}).Count` (force array context).
+- **Numeric formatting cleanly ASCII.** Rule 7 worked everywhere visible: `4.3125`, `1.101563`, `1.171875E-02`. No comma-decimals anywhere. Good baseline.
 
-- `scripts/03_fix/F01_neuter_before_calc_hook.ps1`
-- `scripts/04_run/X01_calculate_test.ps1`
-- `docs/known_issues.md` (cycle 005 version with ISSUE-001a/b split + ISSUE-004 boolean rule)
-- `data/audit_reports/calctest_idx6_20260525_145302.md` + `.data.txt`
-- `logs/F01_cycle005_20260525_145227.log`
+### State to leave at end of cycle 006
 
-## Cycle 005 plan -- "do one thing, measure"
+- **Hook still disabled** (renamed to `.disabled_cycle005`). The new finding makes this state useless for testing calc, but restoring or stubbing is a Day-3 design decision for Claude. Leaving as-is so the next cycle can deliberately choose the path.
+- Calculate signature `oLEAP.Calculate True` is now known and should be the canonical pattern going forward (will update project rules if Claude wants).
 
-Two scripts, run in order. Reversible at every step.
+### Cycle 006 artifacts
 
-**Step A: Snapshot the current state**
+- `scripts/01_scout/S03_probe_calc_api.ps1`
+- `docs/ui_procedures/UP01_inspect_api_via_script_editor.md`
+- `docs/known_issues.md` (cycle 006 version with ISSUE-005, ISSUE-006)
+- `data/audit_reports/calc_api_probe_20260525_150610.md` + `.data.txt`
+
+(Did NOT run UP01 -- agent can't click in LEAP UI. S03 alone yielded the signature, so UP01 is now optional. Aliaskar may still want to verify via Script Editor for the Calculate parameter semantics, e.g. what True vs False actually means.)
+
+## Cycle 006 plan -- two parts, both yield Calculate signature
+
+**Part A: probe via script (60-120 seconds)**
 ```powershell
-Copy-Item data\snapshots\cycle_000_colleague_baseline.leap data\snapshots\cycle_005_before_F01.leap.bak
-# (not strictly needed since F01 only touches one file, but cheap insurance)
+.\scripts\01_scout\S03_probe_calc_api.ps1 -AreaIndex 6
 ```
 
-**Step B: Disable the hook**
-```powershell
-.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6
-```
+S03 does:
+1. Introspects `oLEAP` and `oLEAP.ActiveArea` for 9 + 6 candidate method names (`Calculate`, `Calc`, `CalculateAll`, `Recalculate`, `Run`, `RunCalculation`, `Compute`, etc.). Detects "method present but needs args" (Err 450) vs "method not found" (Err 438).
+2. Attempts 7 different Calculate invocation patterns in sequence:
+   - A: `oLEAP.Calculate` (already known to fail)
+   - C: `oLEAP.Calculate True`
+   - D: `oLEAP.Calculate False`
+   - E: `oLEAP.Calculate 0`
+   - F: `oLEAP.ActiveArea.Calculate`
+   - G: `oLEAP.ActiveArea.Calculate True`
+   - H: `oLEAP.Calculate "S0"`
+3. Logs Err.Number + Description + elapsed for each. Elapsed > 5s = real calc may have started.
 
-Renames `…\KAZ_2024\beforeCalculation.vbs` to `…\KAZ_2024\beforeCalculation.vbs.disabled_cycle005`. Reversible:
-```powershell
-.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6 -Restore
-```
+**Watch out:** if one of attempts C-H actually dispatches and starts a real calc, the script may run for many minutes. The wrapper has a 30-minute kill timeout.
 
-**Step C: Test Calculate**
-```powershell
-.\scripts\04_run\X01_calculate_test.ps1 -AreaIndex 6
-```
+**Part B: read API docs from LEAP's own Script Editor (3-5 minutes manual)**
 
-Runs `oLEAP.Calculate`, captures result + diagnostics. Timeout 30 min.
+Follow `docs/ui_procedures/UP01_inspect_api_via_script_editor.md`. Open LEAP -> Advanced -> Edit Scripts. The right-pane API browser shows method signatures with parameter types. Screenshot the `Calculate` entry and any others of interest. Commit screenshots to `docs/screenshots/`.
 
-**Three possible outcomes:**
+**Do BOTH parts.** They cross-verify each other. S03 may have false negatives (wrong arg type interpreted as "method not present"); the Script Editor never lies about signatures.
 
-| Calc result | Next step |
-|---|---|
-| OK | Open LEAP UI, view Results, screenshot a chart. We've passed Day 3 and Day 4 in one cycle. Skip to Day 5 scope reduction. |
-| Fails on nodal/distribution | F01 didn't work as expected. Re-read F01 logic, possibly LEAP cached the script. Manual UI verification needed. |
-| Fails on different error | Capture the error verbatim. Sequence: investigate via cycle 006. ISSUE-001b (SimType) and/or ISSUE-002 (broken units) likely in scope. |
+## After cycle 006
+
+If S03 + UP01 yield the correct signature:
+- Patch X01 with the correct signature
+- Re-run X01 -> hopefully reach actual calc -> see what (if any) error fires
+- Then we know whether F01's hook-disable was sufficient
+
+If neither yields a signature:
+- We've hit something deep. Possible escalation: ask SEI forum directly, or skip COM-driven calc and use UI F9 + screen capture instead. UI-driven calc is fine for the prototype; the script-driven calc is just for faster iteration.
 
 ## Project rules (cumulative)
 
 1. All `.ps1` and VBS source: pure ASCII, verified at write time
 2. VBS writes UTF-16 LE data files; PowerShell reads with -Encoding Unicode
-3. Address LEAP areas by INDEX (avoid name-collision ambiguity)
-4. Audit scripts READ-ONLY; if save popup appears, click No
-5. Use canonical `BranchVariable("path:var")` accessor
-6. **NEW:** VBS never writes `CStr(boolean)`; always `If x Then "1" Else "0"`. PowerShell parses 1/0.
-7. **NEW:** When making model changes, fix one thing at a time. Test between each. Maintain restore path.
+3. Address LEAP areas by INDEX
+4. Audit/scout scripts READ-ONLY; click No on save popups
+5. Use canonical `BranchVariable("path:var")` accessor for variable read/write
+6. VBS never writes `CStr(boolean)`; always `If x Then "1" Else "0"`. PowerShell parses 1/0.
+7. **NEW:** VBS never writes locale-formatted numbers (`FormatNumber`, `CStr(double)`). Use `Replace(CStr(n), ",", ".")` helper. PowerShell parses on dot.
+8. Fix one variable at a time. Maintain restore path. Test between changes.
 
 ## Cycle log
 
 - 000: scaffolding
-- 001-002: name collision exposed, two areas with same key
-- 003: index addressing solved that
-- 004: canonical accessor fix, hook file confirmed live, ISSUE-001 split
-- 005: F01 disabled hook SUCCESS; X01 hit VBS Err 450 on `oLEAP.Calculate` -- script harness bug, not a model error. Hook still disabled at cycle 005 close, ready for cycle 006 X01 retry.
+- 001-002: name collision exposed
+- 003: index addressing
+- 004: canonical SimType accessor, ISSUE-001 split
+- 005: F01 hook disable applied, X01 ran but Calculate signature wrong
+- 006: S03 probe → Calculate signature = `oLEAP.Calculate Bool`; F01 rename approach DISPROVEN (LEAP requires hook file to exist; rename → "File not found"). Next: F02 = stub hook content.
 
 ## Open questions
 
-- [ ] Does disabling the hook unblock calc? -- **STILL UNKNOWN** (X01 hit script bug before Calculate could run; F01 unverified end-to-end). Reanswer in cycle 006.
-- [ ] What is the correct `oLEAP.Calculate` invocation signature on this install? -- **NEW**, needs cycle 006 X01 v2 patch. Try `Calculate True/False`, `Calculate(scenarios)`, `ActiveArea.Calculate`. Reference: check if the colleague's pre-migration scripts in BTR_LEAP_01 have a Calculate call.
-- [ ] If hook-only fix works, what does the next failure look like? (answered when X01 v2 actually runs)
-- [ ] Is NetworkSimulation(Pipeline) on transformation actually NEMO-required, or benign? (still open, may not matter if 001a fix is enough)
-- [ ] How many branches under Demand actually have Avg Environmental Loading + bad units? (v5 audit, not in cycle 005)
+- [x] What is the correct Calculate signature? -- **`oLEAP.Calculate True`** (Bool or Int arg; method on Application, not ActiveArea)
+- [x] Does F01's rename actually disable the hook? -- **NO**, LEAP requires the file to exist; rename yields "File not found" error -2147418113 BEFORE calc runs
+- [ ] What does F02 (stub the file content) look like as a script? -- next cycle
+- [ ] After F02, does Calculate progress past the hook? (next cycle)
+- [ ] Does S03's `Calculate True` arg mean "show progress", "save after", or something else? -- minor, can resolve via UP01 when convenient
+- [ ] Two PS Count quirks worth a one-line fix in any cycle: `@(...).Count` array-context wrapper (cosmetic)

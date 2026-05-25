@@ -249,3 +249,53 @@ This is now a permanent project rule (HANDOFF.md rule 6).
 ### Files affected
 - Any VBScript writing boolean values
 - v4 of S02_audit_model.ps1 had a wrong verdict line because of this (data table was correct)
+
+
+---
+
+## ISSUE-005: Calculate API signature unknown on this install
+
+**First observed:** cycle 005, 2026-05-22
+**Severity:** 🔴 blocks Calculate testing
+**Affected:** all attempts to invoke Calculate via COM
+
+### Symptoms
+`oLEAP.Calculate` (no args) raises VBScript Err 450 ("wrong number of arguments or invalid property assignment") immediately, without starting any actual calculation. LEAP-reported calc elapsed is 0.
+
+### Root cause
+The bare no-arg call is not the right signature. The correct signature is install-specific and not publicly documented by SEI. The authoritative source is LEAP's built-in Script Editor (Advanced -> Edit Scripts), which has API auto-complete with parameter types.
+
+### Investigation strategy
+1. Run `scripts/01_scout/S03_probe_calc_api.ps1 -AreaIndex 6` to enumerate methods on `oLEAP` and `oLEAP.ActiveArea`, and try several Calculate invocation patterns.
+2. If S03 is inconclusive, follow `docs/ui_procedures/UP01_inspect_api_via_script_editor.md` to read the signature from LEAP's own help pane.
+3. Update `X01_calculate_test.ps1` with the discovered signature.
+
+### Fix (pending cycle 006)
+Replace `oLEAP.Calculate` in X01 with whatever S03 / UP01 reveals as correct.
+
+---
+
+## ISSUE-006: Locale-leaked numeric stringification in VBS
+
+**First observed:** cycle 005, 2026-05-22
+**Severity:** 🟡 silent corruption -- numeric values written by VBS contain `,` instead of `.` on Russian-locale installs
+
+### Symptoms
+VBS code like `outFile.WriteLine "T|" & FormatNumber(end_time - start_time, 2)` produces lines like `T|0,00` on Russian-locale LEAP installs. PowerShell parsing with `[double]::Parse(...)` on a non-RU machine then misinterprets the value.
+
+### Root cause
+`FormatNumber` and default `CStr(double)` use locale-specific decimal separator. The system locale leaks through VBScript runtime even when we want pure ASCII output.
+
+### Fix (now a permanent project rule, HANDOFF.md rule 7)
+For numeric values written to data files, force ASCII decimal:
+```vbscript
+Function NumStr(n)
+    NumStr = Replace(CStr(n), ",", ".")
+End Function
+outFile.WriteLine "T|" & NumStr(end_time - start_time)
+```
+Never use `FormatNumber` for data file output. PowerShell parses on dot only.
+
+### Files affected
+- v1 of X01_calculate_test.ps1 (had `FormatNumber`); fixed in v2
+- Going forward: all numeric VBS output uses the NumStr helper
