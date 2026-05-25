@@ -7,8 +7,9 @@
 ## Current state
 
 - **Date:** 2026-05-25
-- **Cycle:** 006 (Calculate signature DISCOVERED; F01 rename approach DISPROVEN)
-- **Day in 7-day plan:** 3 / 7 (Calculate signature unblocks every subsequent test; F01 approach needs replacement)
+- **Cycle:** 007 (agent-driven; X01 v2 actually ran Calculate; new error surfaced)
+- **Day in 7-day plan:** 3 / 7 (Calculate now reachable; surface failure mode is unrelated to ISSUE-001 hook)
+- **Hook state:** RESTORED (original beforeCalculation.vbs is back; F01 disable was reversed before X01 v2)
 - **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap` (KAZ_2024 = index 6)
 - **Hook state:** DISABLED (renamed to `.disabled_cycle005`). Reversible.
 
@@ -22,6 +23,53 @@ Cycle 005 also exposed locale leak in `FormatNumber` -> `0,00`. New project rule
 
 - **001a (hook):** F01 applied. Hook file renamed. Untested.
 - **001b (SimType):** Not touched. Not addressing in cycle 006.
+
+## Last cycle (cycle 007 results, agent-driven) -- 2026-05-25
+
+After Aliaskar restored the hook (F01 -Restore), I built X01 v2 (`scripts/04_run/X01_calculate_test_v2.ps1`) with two minimal patches over X01 v1:
+1. SIGNATURE: `oLEAP.Calculate False` (cycle 006 discovery, bool arg)
+2. RULE 7: elapsed time via `Replace(CStr(Round(...)), ",", ".")` not `FormatNumber`
+
+Ran on the restored state. **Calculate dispatched and actually executed.** 556.9s wall (LEAP cold-start was slow today), of which **42.15s was LEAP-reported real calc work**. Then a NEW error fired:
+
+| Field | Value |
+|---|---|
+| Err.Number | -2147418113 (E_UNEXPECTED, LEAP-internal) |
+| Err.Description | **`First year parameter (2010) must be within range 2024-2045.`** |
+
+### What this tells us
+
+- Calculate signature confirmed in real use: `oLEAP.Calculate False`. The pattern is canonical going forward.
+- The expected ISSUE-001 nodal-distribution error **did not fire**. Either the hook ran successfully OR the year-range validation failed BEFORE the hook executed (LEAP pre-flight validation). Given the 42.15s elapsed, my best guess is the hook DID run — pre-flight checks should be milliseconds, not 40 seconds.
+- A NEW issue surfaced: **`2010` is leaking in as a "First year parameter"** even though `BaseYear=2024` is correctly set on the area. The 2010 is from somewhere persisted.
+
+### Cause located
+
+`AreaSettingsINI.txt` line 237 in `…\KAZ_2024\` contains:
+
+```
+YearID=2010
+YearLabelIncrement=5
+YearList=2020,2025,2030,2035
+```
+
+Compare to line 12: `EBalYearID=2024`. The colleague updated `EBalYearID` to 2024 but **missed `YearID`**. Also `YearList=2020,...` includes 2020 which is also < 2024.
+
+This is provisionally **ISSUE-007 ("YearID stale at 2010 in AreaSettingsINI.txt")**. AreaSettings normally hold UI persistence (selected year, label preferences) but LEAP's Calculate appears to read at least `YearID` as a "first year parameter."
+
+### Decision for cycle 008 (about to do)
+
+Two paths, both surgical and reversible:
+- **F03 (filesystem edit):** backup AreaSettingsINI.txt, change `YearID=2010` → `YearID=2024`, change `YearList=2020,2025,2030,2035` → `YearList=2025,2030,2035,2040`, re-run X01 v2.
+- **COM-driven edit:** find the right property and set via script. Cleaner long-term but we don't know the property name yet.
+
+Going with F03 — fastest path to verify the diagnosis. Backup the .ini, edit, re-test. Revert in one command if it fails.
+
+### Cycle 007 artifacts
+
+- `scripts/04_run/X01_calculate_test_v2.ps1`
+- `data/audit_reports/calctest_v2_idx6_20260525_152716.md` + `.data.txt`
+- `logs/X01v2_idx6_20260525_152716.log`
 
 ## Last cycle (cycle 006 results) -- 2026-05-25
 
