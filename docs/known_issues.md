@@ -176,3 +176,76 @@ Same as prototype fix. This is a permanent rule. Add to project style guide.
 ### Production fix (v0.2+ — deferred)
 ### Files affected
 ```
+
+
+---
+
+## ISSUE-001 SPLIT (cycle 004, 2026-05-22)
+
+Cycle 004 audit revealed that ISSUE-001 is actually two independent failure modes that happen to share the same error message in certain scenarios. They need separate fixes.
+
+### ISSUE-001a: beforeCalculation hook computes invalid nodal distributions
+
+**This is the proximate cause of "nodal distribution shares sum to 0%".**
+
+The hook file `…\<area>\beforeCalculation.vbs` (or `.vbs_Safe` in some installs) contains logic that:
+1. Reads Russia electricity exports demand
+2. Computes percentage shares for `KAZ_North/West/South` transmission node branches
+3. Writes those shares to `Nodal Distribution` variables
+
+When inputs are wrong (e.g. BaseYear changed and demand totals are zero or NaN for the new year), the computation produces zeros. Then NEMO calc validates that shares sum to 100% per region, finds 0%, and aborts.
+
+**Prototype fix (Day 3 fix B):**
+Rename the hook file to disable it. The file `…\<area>\beforeCalculation.vbs` becomes `…\<area>\beforeCalculation.vbs.disabled_cycleNNN`. LEAP reads the hook from this exact path at calc time, so renaming disables it on the next calc with zero COM interaction.
+
+Implemented in `scripts/03_fix/F01_neuter_before_calc_hook.ps1`. Reversible via `-Restore` flag.
+
+### ISSUE-001b: Transformation Electricity Production SimType = NetworkSimulation(Pipeline)
+
+**This is a separate problem that may or may not block calc.**
+
+On KAZ_2024, all 390 (region × scenario) pairs of `Transformation\Electricity Production:Simulation Type` are uniformly set to `NetworkSimulation(Pipeline)`. The argument `Pipeline` (not `Transmission`) suggests gas/oil pipeline optimization on transformation. Whether this requires NEMO to succeed independently is unknown.
+
+**Decision:** do not touch 001b in cycle 005. Test calc after 001a fix only. If calc fails with a Pipeline/NEMO-related error, address 001b in cycle 006.
+
+**If a fix is needed for 001b:** the safest path is to set all 390 pairs to `Standard` using `BranchVariable("Transformation\Electricity Production:Simulation Type").ExpressionRS(r.Id, s.Id) = "Standard"` (canonical accessor pattern). Plus the Current Accounts column.
+
+### Note on the canonical SimType accessor
+
+Two accessor patterns are seen across LEAP COM:
+- `oLEAP.Branches(path).Variable(name).ExpressionRS(...)` -- **broken on this install**, returns Nothing silently
+- `oLEAP.BranchVariable("path:varname").ExpressionRS(...)` -- **works**, this is the colleague's pattern and matches LEAP forum guidance
+
+Always use the `BranchVariable("path:var")` form. The Branches.Variable chain is a trap.
+
+---
+
+## ISSUE-004: Localized boolean serialization in VBS (Russian LEAP)
+
+**First observed:** cycle 004, 2026-05-22
+**Severity:** 🟡 silent corruption -- data correct but verdict wrong
+
+### Symptoms
+VBScript code like:
+```vbscript
+outFile.WriteLine "FLAG|" & CStr(some_boolean)
+```
+On a Russian-localized LEAP install produces output like `FLAG|Истина` (true) or `FLAG|Ложь` (false), not `True`/`False`.
+
+If PowerShell parser then does `if ($_.Flag -eq "True") { ... }`, every boolean check silently evaluates wrong.
+
+### Root cause
+`CStr(boolean)` uses locale-specific stringification. The LEAP install uses Russian as system language, which propagates to VBScript runtime.
+
+### Fix
+VBS code MUST NEVER write `CStr(boolean)`. Use explicit conversion:
+```vbscript
+If some_boolean Then outFile.WriteLine "FLAG|1" Else outFile.WriteLine "FLAG|0"
+```
+PowerShell parses on `"1"` / `"0"` only.
+
+This is now a permanent project rule (HANDOFF.md rule 6).
+
+### Files affected
+- Any VBScript writing boolean values
+- v4 of S02_audit_model.ps1 had a wrong verdict line because of this (data table was correct)

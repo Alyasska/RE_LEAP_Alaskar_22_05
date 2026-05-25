@@ -7,119 +7,135 @@
 ## Current state
 
 - **Date:** 2026-05-25
-- **Cycle:** 004 (Day 2 audit revision 4, COMPLETE; clean numbers + scope clarity for Day 3)
-- **Day in 7-day plan:** 2 / 7 (Day 2 done after cycle 004; Day 3 scope known)
-- **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap`
+- **Cycle:** 005 (Day 3 fix B attempted; F01 succeeded, X01 hit a script bug not a model error)
+- **Day in 7-day plan:** 3 / 7 (need a one-line X01 patch for cycle 006 before we can test the fix)
+- **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap` (KAZ_2024 area is index 6)
 - **LEAP install:** Russian-localized, 2024.4.0.8
 
-## Confirmed from cycle 003
+## CRITICAL FINDINGS from cycle 004
 
-- **Area index 6** is `KAZ_2024` (the prototype target, BaseYear=2024)
-- **Area index 7** is `kaz_workshop exercise` (the pre-migration parent, BaseYear=2010)
-- LEAP install also has 10 other unrelated areas (Asiana, Freedonia, GHG Mitigation Exercise, etc.)
-- Index addressing is reliable; `Open sanity: PASSED` per v3
-- The 5 broken-unit branches do not exist at their original paths in KAZ_2024 (confirmed twice independently). They were either deleted or restructured.
-- Demand subtree has 1590 leaves matching Lubricants/Methane/Nitrous Oxide/LPG patterns. Most are noise (every region x fuel x gas combo). Real fix scope = subset with Avg Environmental Loading and bad units.
+1. **SimType reader works with `BranchVariable("path:var")`** -- 390/390 pairs are uniformly `NetworkSimulation(Pipeline)`. Zero variation. This is **gas/oil pipeline** optimization, not electricity nodal distribution.
+2. **Hook file is live**: `…\KAZ_2024\beforeCalculation.vbs` (19045 bytes, 322 lines, contains `KAZ_North` references and nodal distribution logic).
+3. **The two parts of ISSUE-001 are independent failure modes.**
 
-## Cycle 003 bug (mine to fix in v4)
+## ISSUE-001 split into 001a and 001b
 
-- v3 used `oLEAP.Branches(path).Variable(name)` for SimType. This accessor returns `Nothing` silently on this LEAP install.
-- Canonical accessor (per `docs/known_issues.md` ISSUE-001 and colleague's own VBS): `oLEAP.BranchVariable("Path:VarName")`.
-- v4 switches to the canonical accessor.
+- **001a: hook computes invalid nodal distributions** -- this is what produces the "sums to 0%" error. Filesystem fix (rename `beforeCalculation.vbs` to disabled). Day 3 fix B.
+- **001b: 390 SimType=NetworkSimulation(Pipeline) for transformation** -- separate problem, may or may not block calc. We don't touch this in cycle 005. If calc still fails after 001a fix, we address 001b in cycle 006.
 
-## Cycle 003 also revealed two dead-weight areas
+## Cycle 004 also produced a parser bug
 
-- Index 8: `Kazakhstan_new` -- old colleague snapshot, status unknown
-- Index 9: `Kazakhtsan_new2` (sic, typo in name) -- ditto
+v4 PowerShell parser checked `HasNodal -eq "True"` but VBS `CStr(boolean)` returns localized `Истина` on Russian LEAP install. Verdict line was wrong despite data being correct.
 
-Not investigating these in cycle 004. Will probe with a quick S00 v2 later if relevant to Day 5 cleanup.
+**New project rule:** VBScript NEVER writes `CStr(boolean)`. Always: `If x Then "1" Else "0"`. PowerShell parses on "1"/"0" only.
 
-## Last cycle (cycle 004 results) -- 2026-05-25
+## Last cycle (cycle 005 results) -- 2026-05-25
 
-S02 v4 -AreaIndex 6, completed in **41.2 seconds** (faster than v3's 93.5s -- fewer COM operations because fuzzy walk dropped). Clean teardown, no popup.
+### F01 -- SUCCEEDED
+- Probed area dir via COM in 20.1s, resolved area `KAZ_2024` at `C:\Users\User\Documents\LEAP_16_04\LEAP Areas\kaz_workshop exercise\KAZ_2024\`
+- Renamed `beforeCalculation.vbs` (19045 bytes) → `beforeCalculation.vbs.disabled_cycle005`
+- **Reversible**: `.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6 -Restore`
+- (Skipped LEAP-UI manual verification step -- agent can't click in UI; Aliaskar to confirm if needed)
 
-### Accessor fix CONFIRMED working
+### X01 -- SCRIPT BUG, NOT MODEL ERROR
 
-`SIMTYPE_STATUS = VAR_OK`. The canonical `BranchVariable("path:var")` accessor reads cleanly. All 390 region-scenario pairs returned non-empty values without errors.
+22.1s wall time (mostly LEAP cold start). The hook fix could NOT be tested because Calculate itself never ran.
 
-Curiosity for the record: the hook file itself (which we now have) shows the colleague uses `leap.branches(path).Variable(name).expressionrs(...) = expr` in **chained-call write context** and that pattern works. So `Branches.Variable` is not fundamentally broken -- it only returns Nothing when extracted via a standalone `Set var = ...`. Use `BranchVariable` for reads, the chained pattern for writes (matches colleague's idiom).
+| Field | Value |
+|---|---|
+| Calc elapsed (LEAP-reported) | **0,00s** (note Russian-locale decimal comma; we hit 0 ms of actual calc) |
+| Err.Number | **450** |
+| Err.Description (RU) | `Недопустимое число аргументов или присвоение значения свойства` |
+| Translation | **"Wrong number of arguments or invalid property assignment"** |
+| Phase reached | `calc_done` (so the VBS got past `Err.Clear ; oLEAP.Calculate ; capture Err`) |
 
-### Day 3 scope is huge but uniform
+VBS error 450 is the **VBScript runtime** error for bad method dispatch -- it's not a LEAP error, it's COM saying our call signature is wrong. The X01 VBS does:
 
-**All 390 (region x scenario) pairs are explicitly set to `NetworkSimulation(Pipeline)`.** Every single one. 6 regions x 65 scenarios = 390. Zero errors, zero non-empty-non-Network values, zero inheritance from CA.
-
-Important sub-finding: the argument is **`Pipeline`, not `Transmission`**. This is gas/oil pipeline NetworkSimulation, NOT the electricity transmission optimization. The nodal-distribution bug in `beforeCalculation.vbs` is a **separate** electricity-side issue. We now have two transmission-flavored things to deal with in Day 3, not one:
-1. `Simulation Type = NetworkSimulation(Pipeline)` at module level, 390 explicit pairs
-2. `beforeCalculation` hook writing `Nodal Distribution` on KAZ_North/West/South electricity nodes
-
-Day 3 options:
-- **A**: clear/set-to-Standard the SimType at all 390 pairs (large but mechanical -- BatchSecondVar pattern)
-- **B**: neutralize the beforeCalculation hook (rename / empty body / `Exit Sub` early)
-- **Probably both** are needed. Either alone may not be sufficient.
-
-### Hook file IS PRESENT (despite v4 verdict line saying otherwise)
-
-`beforeCalculation.vbs` exists in `C:\Users\User\Documents\LEAP_16_04\LEAP Areas\kaz_workshop exercise\KAZ_2024\` -- 19,045 bytes, 322 lines. The file's first comment block is the same one cited in `docs/known_issues.md` ISSUE-001.
-
-Confirmed by grep on the actual file:
-- Contains `nodal` at lines 3, 79, 80, 81, 180, 182, 184, 189, 194, 195, ...
-- Contains `KAZ_North` at lines 53, 60, 61, 62, 69, 79, ...
-- Comment line 1: "Temporary before calculation script designed to work around some LEAP bugs, including: Improper populating of nodal distribution variables in NEMO"
-
-The full hook is preserved and active in KAZ_2024.
-
-### v4 parser bug to flag (PROJECT RULE candidate)
-
-The verdict line at the bottom of the v4 report reads:
-> "ISSUE-001 hook: NOT detected as a separate file. Possibly inactive in KAZ_2024 already."
-
-**This is wrong.** The table above the verdict correctly shows `HOOK_FOUND` with `Has 'nodal' = Истина` and `Has 'KAZ_North' = Истина`. The PowerShell parser at line ~459 does:
-
-```powershell
-$anyNodal = ($hookFound | Where-Object { $_.HasNodal -eq "True" }).Count -gt 0
+```vbscript
+Err.Clear
+oLEAP.Calculate   ' <-- bare call, no args, no parens
+err_num = Err.Number
 ```
 
-VBS `CStr(True)` on a Russian-localized install returns **`Истина`**, not `"True"`. The comparison is False, the wrong-branch verdict fires. **Project rule for the future:** when VBS writes booleans, write the integer (`If x Then writeline "1" Else writeline "0"`), never `CStr(boolean)`. Or alternatively the PS side compares against `Истина OR True`. Adding this to the project rules section below.
+The `Calculate` method on `LEAP.LEAPApplication` is not callable this way on this install. Three plausible patterns to try in cycle 006:
 
-### ISSUE-002 (broken paths) -- consistent
+1. `oLEAP.Calculate True` (or `False`) -- common LEAP signature takes a boolean (e.g. SaveAfter or ShowProgress)
+2. `oLEAP.Calculate(scenarios)` -- requires scenario id list/object
+3. `oLEAP.ActiveArea.Calculate` -- method may live on Area, not Application
 
-0 / 5 verbatim paths present. **Third independent confirmation.** Day 4 needs a fuzzy walk with filter on `VariableExists("Avg Environmental Loading")` -- per v5 plan.
+`Err.Number 450` plus 0,00s LEAP-reported elapsed = method dispatch failed immediately. We never reached the hook, so we still don't know whether F01 actually fixes ISSUE-001a.
 
-### Cycle 004 artifacts
+### State to leave at end of cycle 005
 
-- `scripts/01_scout/S02_audit_model_v4.ps1`
-- `data/audit_reports/audit_cycle_004_idx6_20260525_125131.md` + `.data.txt`
-- `logs/S02v4_idx6_20260525_125131.log`
+- F01 change is **left in place** (hook disabled). Don't restore yet; we'll need it disabled when X01 v2 actually runs.
+- No model state changed via COM. Only one filesystem rename (the hook), reversible.
+- Project state is clean: cycle 006 needs only an X01 patch.
 
-## v5 plan (next cycle if v4 unblocks Day 3 sizing)
+### Cycle 005 artifacts committed
 
-Filtered fuzzy walk: walk Demand subtree, but at each branch test `VariableExists("Avg Environmental Loading")` AND try to read its `Unit` / `UnitDenominator` properties (whatever the COM exposes -- we will probe property names like in S00). Output a small list of branches with the loading variable, annotated with whether their unit metadata looks broken. This replaces the 1590-row noise dump.
+- `scripts/03_fix/F01_neuter_before_calc_hook.ps1`
+- `scripts/04_run/X01_calculate_test.ps1`
+- `docs/known_issues.md` (cycle 005 version with ISSUE-001a/b split + ISSUE-004 boolean rule)
+- `data/audit_reports/calctest_idx6_20260525_145302.md` + `.data.txt`
+- `logs/F01_cycle005_20260525_145227.log`
 
-We do NOT yet know whether the unit metadata is readable via COM. v5 will find out.
+## Cycle 005 plan -- "do one thing, measure"
 
-## Project rules (updated)
+Two scripts, run in order. Reversible at every step.
 
-- All `.ps1` and VBS source: pure ASCII, verified at write time
-- VBS writes UTF-16 LE data files; PowerShell reads with -Encoding Unicode
-- Address LEAP areas by INDEX (avoid name-collision ambiguity)
-- Audit scripts READ-ONLY; if save popup appears, click No
-- **Variable reads:** use `oLEAP.BranchVariable("path:var")` accessor (canonical)
-- **Variable writes:** use chained `oLEAP.Branches("path").Variable("name").ExpressionRS(r,s) = expr` (matches colleague's idiom and works)
-- **Never use `Set var = oLEAP.Branches(path).Variable(name)`:** returns Nothing on this install. Use BranchVariable for the intermediate object.
-- **NEW (cycle 004):** When VBS writes booleans to the data file, write `1`/`0` (integers), never `CStr(boolean)`. On Russian-localized LEAP installs `CStr(True) = "Истина"` and PowerShell `-eq "True"` comparisons fail. Either: write integers, or compare against both English+localized strings.
+**Step A: Snapshot the current state**
+```powershell
+Copy-Item data\snapshots\cycle_000_colleague_baseline.leap data\snapshots\cycle_005_before_F01.leap.bak
+# (not strictly needed since F01 only touches one file, but cheap insurance)
+```
+
+**Step B: Disable the hook**
+```powershell
+.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6
+```
+
+Renames `…\KAZ_2024\beforeCalculation.vbs` to `…\KAZ_2024\beforeCalculation.vbs.disabled_cycle005`. Reversible:
+```powershell
+.\scripts\03_fix\F01_neuter_before_calc_hook.ps1 -AreaIndex 6 -Restore
+```
+
+**Step C: Test Calculate**
+```powershell
+.\scripts\04_run\X01_calculate_test.ps1 -AreaIndex 6
+```
+
+Runs `oLEAP.Calculate`, captures result + diagnostics. Timeout 30 min.
+
+**Three possible outcomes:**
+
+| Calc result | Next step |
+|---|---|
+| OK | Open LEAP UI, view Results, screenshot a chart. We've passed Day 3 and Day 4 in one cycle. Skip to Day 5 scope reduction. |
+| Fails on nodal/distribution | F01 didn't work as expected. Re-read F01 logic, possibly LEAP cached the script. Manual UI verification needed. |
+| Fails on different error | Capture the error verbatim. Sequence: investigate via cycle 006. ISSUE-001b (SimType) and/or ISSUE-002 (broken units) likely in scope. |
+
+## Project rules (cumulative)
+
+1. All `.ps1` and VBS source: pure ASCII, verified at write time
+2. VBS writes UTF-16 LE data files; PowerShell reads with -Encoding Unicode
+3. Address LEAP areas by INDEX (avoid name-collision ambiguity)
+4. Audit scripts READ-ONLY; if save popup appears, click No
+5. Use canonical `BranchVariable("path:var")` accessor
+6. **NEW:** VBS never writes `CStr(boolean)`; always `If x Then "1" Else "0"`. PowerShell parses 1/0.
+7. **NEW:** When making model changes, fix one thing at a time. Test between each. Maintain restore path.
 
 ## Cycle log
 
 - 000: scaffolding
-- 001: S02 v1 audit (accidentally hit KAZ_2024 via name collision, had 3 bugs)
-- 002: S02 v2 audit (hit 2010 parent via name collision, popup hang)
-- 003: S00 + S02 v3 (index addressing, accessor bug exposed by agent)
-- 004: S02 v4 -- BranchVariable accessor confirmed working; 390 NetworkSimulation(Pipeline) pairs found (all region-scenario combos); beforeCalculation.vbs hook confirmed PRESENT (322 lines, has nodal + KAZ_North refs); parser bug in verdict line (Cyrillic Истина vs "True")
+- 001-002: name collision exposed, two areas with same key
+- 003: index addressing solved that
+- 004: canonical accessor fix, hook file confirmed live, ISSUE-001 split
+- 005: F01 disabled hook SUCCESS; X01 hit VBS Err 450 on `oLEAP.Calculate` -- script harness bug, not a model error. Hook still disabled at cycle 005 close, ready for cycle 006 X01 retry.
 
 ## Open questions
 
-- [x] On KAZ_2024 with the right accessor: how many SimType expressions are Network? -- **390 / 390 (every (region, scenario) pair) are `NetworkSimulation(Pipeline)`**
-- [x] Does the area folder contain a beforeCalculation hook with nodal distribution refs? -- **YES**, 19045 bytes / 322 lines at `kaz_workshop exercise\KAZ_2024\beforeCalculation.vbs`, contains both nodal-distribution logic and KAZ_North/West/South references
-- [ ] How many branches under Demand actually have Avg Environmental Loading? (v5 -- next cycle)
-- [ ] Can we read unit metadata (numerator/denominator) via COM? (v5 probe)
-- [ ] Does NetworkSimulation(Pipeline) actually trigger the same nodal-distribution error, or only the SimulationType=NetworkSimulation electricity path? (Day 3 design decision -- if pipeline is benign, maybe only the hook needs neutralizing)
+- [ ] Does disabling the hook unblock calc? -- **STILL UNKNOWN** (X01 hit script bug before Calculate could run; F01 unverified end-to-end). Reanswer in cycle 006.
+- [ ] What is the correct `oLEAP.Calculate` invocation signature on this install? -- **NEW**, needs cycle 006 X01 v2 patch. Try `Calculate True/False`, `Calculate(scenarios)`, `ActiveArea.Calculate`. Reference: check if the colleague's pre-migration scripts in BTR_LEAP_01 have a Calculate call.
+- [ ] If hook-only fix works, what does the next failure look like? (answered when X01 v2 actually runs)
+- [ ] Is NetworkSimulation(Pipeline) on transformation actually NEMO-required, or benign? (still open, may not matter if 001a fix is enough)
+- [ ] How many branches under Demand actually have Avg Environmental Loading + bad units? (v5 audit, not in cycle 005)
