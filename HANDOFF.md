@@ -7,126 +7,119 @@
 ## Current state
 
 - **Date:** 2026-05-25
-- **Cycle:** 003 (Day 2 audit COMPLETE, clean numbers obtained; awaiting Claude+Aliaskar before Day 3)
-- **Day in 7-day plan:** 2 / 7 (Day 2 finished; Day 3 shape to be redesigned by Claude based on findings below)
+- **Cycle:** 004 (Day 2 audit revision 4, COMPLETE; clean numbers + scope clarity for Day 3)
+- **Day in 7-day plan:** 2 / 7 (Day 2 done after cycle 004; Day 3 scope known)
 - **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap`
 - **LEAP install:** Russian-localized, 2024.4.0.8
 
-## CRITICAL FINDING from cycle 002
+## Confirmed from cycle 003
 
-**Two installed areas share the same Areas-collection key** `kaz_workshop exercise`:
+- **Area index 6** is `KAZ_2024` (the prototype target, BaseYear=2024)
+- **Area index 7** is `kaz_workshop exercise` (the pre-migration parent, BaseYear=2010)
+- LEAP install also has 10 other unrelated areas (Asiana, Freedonia, GHG Mitigation Exercise, etc.)
+- Index addressing is reliable; `Open sanity: PASSED` per v3
+- The 5 broken-unit branches do not exist at their original paths in KAZ_2024 (confirmed twice independently). They were either deleted or restructured.
+- Demand subtree has 1590 leaves matching Lubricants/Methane/Nitrous Oxide/LPG patterns. Most are noise (every region x fuel x gas combo). Real fix scope = subset with Avg Environmental Loading and bad units.
 
-| Area (best guess) | BaseYear | What |
-|---|---|---|
-| Parent area | 2010 | Original SEI workshop file, pre-migration |
-| Nested `KAZ_2024` | 2024 | Colleague's migrated version (this is our prototype target) |
+## Cycle 003 bug (mine to fix in v4)
 
-`oLEAP.Areas("kaz_workshop exercise").Open` resolves non-deterministically:
-- v1 (cycle 001) accidentally opened the 2024 nested area
-- v2 (cycle 002) opened the 2010 parent
+- v3 used `oLEAP.Branches(path).Variable(name)` for SimType. This accessor returns `Nothing` silently on this LEAP install.
+- Canonical accessor (per `docs/known_issues.md` ISSUE-001 and colleague's own VBS): `oLEAP.BranchVariable("Path:VarName")`.
+- v4 switches to the canonical accessor.
 
-**Resolution strategy:** address areas by INDEX into `oLEAP.Areas`, not by name. v3 does this.
+## Cycle 003 also revealed two dead-weight areas
 
-Bonus: v2 also got stuck on a "save changes?" popup during teardown. Read-only audits should not need to save, but LEAP may flag the area as modified anyway (view state, etc.). The agent dismissed the popup manually. v3 may hit the same; we will harden v4 only if it actually blocks.
+- Index 8: `Kazakhstan_new` -- old colleague snapshot, status unknown
+- Index 9: `Kazakhtsan_new2` (sic, typo in name) -- ditto
 
-## Cycle 002 also revealed
+Not investigating these in cycle 004. Will probe with a quick S00 v2 later if relevant to Day 5 cleanup.
 
-- v1's "0 of 5 broken-unit branches" reading was on the 2024 nested area, suggests colleague may have deleted them, but we cannot trust it because we did not run fuzzy search on the right area
-- v2 read the parent area (2010) and found 5/5 still have HAS_LOADING, but that is the pre-migration state, not what we need
+## Last cycle (cycle 004 results) -- 2026-05-25
 
-We will know the actual state of the 2024 area only after v3.
+S02 v4 -AreaIndex 6, completed in **41.2 seconds** (faster than v3's 93.5s -- fewer COM operations because fuzzy walk dropped). Clean teardown, no popup.
 
-## Confirmed across both reads
+### Accessor fix CONFIRMED working
 
-- 6 regions, 65 scenarios in both areas (same model topology, expected)
-- BaseYear of nested area really is 2024 (per v1's reading)
-- BaseYear of parent area really is 2010 (per v2's reading)
-- Transmission node branches exist in both
-- Russian-localized LEAP, expect Cyrillic in some text fields
+`SIMTYPE_STATUS = VAR_OK`. The canonical `BranchVariable("path:var")` accessor reads cleanly. All 390 region-scenario pairs returned non-empty values without errors.
 
-## Last cycle (cycle 003 results) -- 2026-05-25
+Curiosity for the record: the hook file itself (which we now have) shows the colleague uses `leap.branches(path).Variable(name).expressionrs(...) = expr` in **chained-call write context** and that pattern works. So `Branches.Variable` is not fundamentally broken -- it only returns Nothing when extracted via a standalone `Set var = ...`. Use `BranchVariable` for reads, the chained pattern for writes (matches colleague's idiom).
 
-### Step A: S00_list_areas.ps1 (18.3s, clean)
+### Day 3 scope is huge but uniform
 
-**12 areas installed.** All live under `C:\Users\User\Documents\LEAP_16_04\LEAP Areas\kaz_workshop exercise\` -- LEAP appears to treat every subdirectory of that folder as a separate area. The `kaz_workshop exercise` directory is functioning as the LEAP Areas root, not as a single area.
+**All 390 (region x scenario) pairs are explicitly set to `NetworkSimulation(Pipeline)`.** Every single one. 6 regions x 65 scenarios = 390. Zero errors, zero non-empty-non-Network values, zero inheritance from CA.
 
-`a.BaseYear` etc. are NOT exposed on closed `Area` COM objects on this install (every `AREA_PROP_MISS` for BaseYear/FirstScenarioYear/EndYear/LastModified/etc.). Only `Name` and `Directory` worked. The "Recommended next call" auto-detection at the bottom of the S00 report consequently could not pick a target; I picked manually.
+Important sub-finding: the argument is **`Pipeline`, not `Transmission`**. This is gas/oil pipeline NetworkSimulation, NOT the electricity transmission optimization. The nodal-distribution bug in `beforeCalculation.vbs` is a **separate** electricity-side issue. We now have two transmission-flavored things to deal with in Day 3, not one:
+1. `Simulation Type = NetworkSimulation(Pipeline)` at module level, 390 explicit pairs
+2. `beforeCalculation` hook writing `Nodal Distribution` on KAZ_North/West/South electricity nodes
 
-| Index | Name | Directory (relative to LEAP Areas root) |
-|---|---|---|
-| 1 | Asiana | kaz_workshop exercise/Asiana/ |
-| 2 | central asia | kaz_workshop exercise/central asia/ |
-| 3 | Freedonia | kaz_workshop exercise/Freedonia/ |
-| 4 | Freedonia (Recovered 05-21-26) | kaz_workshop exercise/Freedonia (Recovered 05-21-26)/ |
-| 5 | GHG Mitigation Exercise | kaz_workshop exercise/GHG Mitigation Exercise/ |
-| **6** | **KAZ_2024** | **kaz_workshop exercise/KAZ_2024/** -- prototype target |
-| 7 | kaz_workshop exercise | kaz_workshop exercise/kaz_workshop exercise/ -- 2010 parent (what v2 hit) |
-| 8 | Kazakhstan_new | kaz_workshop exercise/Kazakhstan_new/ |
-| 9 | Kazakhtsan_new2 | kaz_workshop exercise/Kazakhtsan_new2/ (sic, typo in folder) |
-| 10 | Optimization Exercise | kaz_workshop exercise/Optimization Exercise/ |
-| 11 | Transport Exercise | kaz_workshop exercise/Transport Exercise/ |
-| 12 | WEAP-LEAP Tutorial | kaz_workshop exercise/WEAP-LEAP Tutorial/ |
+Day 3 options:
+- **A**: clear/set-to-Standard the SimType at all 390 pairs (large but mechanical -- BatchSecondVar pattern)
+- **B**: neutralize the beforeCalculation hook (rename / empty body / `Exit Sub` early)
+- **Probably both** are needed. Either alone may not be sufficient.
 
-Two other interesting entries to flag: `Kazakhstan_new` (#8) and `Kazakhtsan_new2` (#9, with typo) -- could be earlier colleague snapshots. Not investigated.
+### Hook file IS PRESENT (despite v4 verdict line saying otherwise)
 
-### Step B: S02_audit_model_v3.ps1 -AreaIndex 6 (93.5s, clean teardown, no popup hang)
+`beforeCalculation.vbs` exists in `C:\Users\User\Documents\LEAP_16_04\LEAP Areas\kaz_workshop exercise\KAZ_2024\` -- 19,045 bytes, 322 lines. The file's first comment block is the same one cited in `docs/known_issues.md` ISSUE-001.
 
-**Open sanity: PASSED.** Resolved area `KAZ_2024`, ActiveArea=`KAZ_2024`, BaseYear=**2024**.
+Confirmed by grep on the actual file:
+- Contains `nodal` at lines 3, 79, 80, 81, 180, 182, 184, 189, 194, 195, ...
+- Contains `KAZ_North` at lines 53, 60, 61, 62, 69, 79, ...
+- Comment line 1: "Temporary before calculation script designed to work around some LEAP bugs, including: Improper populating of nodal distribution variables in NEMO"
 
-Headline:
-- BaseYear=2024, 6 regions, 65 scenarios. UTF-16 fix worked: `ResultsShown` shows clean Cyrillic (`Ложь`/`Истина`).
-- ISSUE-001 SimType: `VAR_IS_NOTHING`. The branch exists, `VariableExists("Simulation Type")` returned True, but `Set var = Branches(path).Variable("Simulation Type")` produced a Nothing object **without throwing**. We never iterated scenarios because of the short-circuit. **Likely root cause:** wrong accessor API. Per `docs/known_issues.md` and the colleague's own VBS, the canonical pattern is `oLEAP.BranchVariable("Transformation\Electricity Production:Simulation Type")` (single accessor, colon-separated path) -- NOT `Branches(path).Variable(name)`. v4 should switch to `BranchVariable`. We still do not know NetworkSimulation pair count.
-- ISSUE-002 exact paths: all 5 MISSING in KAZ_2024 (same as v1 saw -- consistent now that we are confidently on the right area).
-- ISSUE-002 fuzzy walk: **1590 candidate branches** under Demand. Colleague restructured rather than deleted. Notable:
-  - `Demand\Agriculture\Amu Darya\Other\Lubricants\Methane` exists (close cousin of one original path)
-  - Agriculture subtree now has Amu Darya, Other, AND Syr Darya region splits
-  - `Demand\Commercial` has no `Lubricants` subtree at all -- has Biomass/Bitumen/Coal/LPG/etc. as direct children. The original `Demand\Commercial\Lubricants\Methane` was restructured away.
-  - Industry/Iron and Steel still exists; `Top down` subbranch needs re-verification.
+The full hook is preserved and active in KAZ_2024.
 
-### v3 verdict (verbatim from report)
+### v4 parser bug to flag (PROJECT RULE candidate)
 
-> This audit ran against the correct prototype-target area (BaseYear=2024).
->
-> **Day 3 sizing:** 0 NetworkSimulation pairs to neutralize
-> **Day 4 sizing:** 0 / 5 exact broken paths, 1590 fuzzy candidates
+The verdict line at the bottom of the v4 report reads:
+> "ISSUE-001 hook: NOT detected as a separate file. Possibly inactive in KAZ_2024 already."
 
-**Caveat on Day 3 number:** "0 NetworkSimulation" is still untrustworthy because SimType was never read (VAR_IS_NOTHING short-circuited the loop). v4 with `BranchVariable` accessor needed before Day 3 can be sized.
+**This is wrong.** The table above the verdict correctly shows `HOOK_FOUND` with `Has 'nodal' = Истина` and `Has 'KAZ_North' = Истина`. The PowerShell parser at line ~459 does:
 
-### Cycle 003 artifacts
+```powershell
+$anyNodal = ($hookFound | Where-Object { $_.HasNodal -eq "True" }).Count -gt 0
+```
 
-- `scripts/01_scout/S00_list_areas.ps1` (new)
-- `scripts/01_scout/S02_audit_model_v3.ps1` (new)
-- `data/audit_reports/area_listing_20260525_123700.md` + `.data.txt`
-- `data/audit_reports/audit_cycle_003_idx6_20260525_123832.md` + `.data.txt`
+VBS `CStr(True)` on a Russian-localized install returns **`Истина`**, not `"True"`. The comparison is False, the wrong-branch verdict fires. **Project rule for the future:** when VBS writes booleans, write the integer (`If x Then writeline "1" Else writeline "0"`), never `CStr(boolean)`. Or alternatively the PS side compares against `Истина OR True`. Adding this to the project rules section below.
 
-## Recommendation to Claude before Day 3
+### ISSUE-002 (broken paths) -- consistent
 
-The audit pipeline now reliably reads ANY indexed area without ambiguity. Two follow-ups before Day 3 can be safely scripted:
+0 / 5 verbatim paths present. **Third independent confirmation.** Day 4 needs a fuzzy walk with filter on `VariableExists("Avg Environmental Loading")` -- per v5 plan.
 
-1. **v4 SimType fix:** swap `Branches(path).Variable(name)` for `oLEAP.BranchVariable("path:var")`. Re-run on index 6. This finally answers the NetworkSimulation question.
-2. **Day 4 path remap:** the 1590 fuzzy matches need filtering to identify branches that have `Avg Environmental Loading` with bad unit metadata. The fuzzy walk currently dumps everything matching name patterns; we want it to filter by `VariableExists("Avg Environmental Loading")` and surface only those, with their unit denominator/numerator if exposed.
+### Cycle 004 artifacts
 
-Once both are done, Day 3 + Day 4 fixes can be scripted against known paths and known counts.
+- `scripts/01_scout/S02_audit_model_v4.ps1`
+- `data/audit_reports/audit_cycle_004_idx6_20260525_125131.md` + `.data.txt`
+- `logs/S02v4_idx6_20260525_125131.log`
 
-## Project rules (still in force)
+## v5 plan (next cycle if v4 unblocks Day 3 sizing)
 
-- All `.ps1` files must be pure ASCII (verified per write)
-- VBS sources must also be pure ASCII (verified per write)
-- VBS writes data to a UTF-16 LE file; PowerShell reads with -Encoding Unicode
-- Audit scripts are READ-ONLY; if a save-changes popup appears, choose No
-- Address LEAP areas by INDEX when name collisions are possible
+Filtered fuzzy walk: walk Demand subtree, but at each branch test `VariableExists("Avg Environmental Loading")` AND try to read its `Unit` / `UnitDenominator` properties (whatever the COM exposes -- we will probe property names like in S00). Output a small list of branches with the loading variable, annotated with whether their unit metadata looks broken. This replaces the 1590-row noise dump.
 
-## Cycle log so far
+We do NOT yet know whether the unit metadata is readable via COM. v5 will find out.
 
-- Cycle 000: scaffolding (committed)
-- Cycle 001: S02 v1 audit, hit 2024 area accidentally, script had 3 bugs (committed)
-- Cycle 002: S02 v2 audit, fixed v1 bugs but hit 2010 area, exposed name collision (committed `2cddf37`)
-- Cycle 003: S00 enumerated 12 areas, S02 v3 cleanly audited index 6 (KAZ_2024), BaseYear=2024 confirmed; SimType still uninspected (VAR_IS_NOTHING from wrong accessor); 5 broken paths restructured (1590 fuzzy candidates)
+## Project rules (updated)
+
+- All `.ps1` and VBS source: pure ASCII, verified at write time
+- VBS writes UTF-16 LE data files; PowerShell reads with -Encoding Unicode
+- Address LEAP areas by INDEX (avoid name-collision ambiguity)
+- Audit scripts READ-ONLY; if save popup appears, click No
+- **Variable reads:** use `oLEAP.BranchVariable("path:var")` accessor (canonical)
+- **Variable writes:** use chained `oLEAP.Branches("path").Variable("name").ExpressionRS(r,s) = expr` (matches colleague's idiom and works)
+- **Never use `Set var = oLEAP.Branches(path).Variable(name)`:** returns Nothing on this install. Use BranchVariable for the intermediate object.
+- **NEW (cycle 004):** When VBS writes booleans to the data file, write `1`/`0` (integers), never `CStr(boolean)`. On Russian-localized LEAP installs `CStr(True) = "Истина"` and PowerShell `-eq "True"` comparisons fail. Either: write integers, or compare against both English+localized strings.
+
+## Cycle log
+
+- 000: scaffolding
+- 001: S02 v1 audit (accidentally hit KAZ_2024 via name collision, had 3 bugs)
+- 002: S02 v2 audit (hit 2010 parent via name collision, popup hang)
+- 003: S00 + S02 v3 (index addressing, accessor bug exposed by agent)
+- 004: S02 v4 -- BranchVariable accessor confirmed working; 390 NetworkSimulation(Pipeline) pairs found (all region-scenario combos); beforeCalculation.vbs hook confirmed PRESENT (322 lines, has nodal + KAZ_North refs); parser bug in verdict line (Cyrillic Истина vs "True")
 
 ## Open questions
 
-- [x] Which area index corresponds to BaseYear=2024? -- **6** (`KAZ_2024`)
-- [ ] On KAZ_2024, how many NetworkSimulation scenarios? -- still unknown, blocked on v4 `BranchVariable` accessor fix (v3 short-circuited at VAR_IS_NOTHING)
-- [x] Do the 5 broken branches exist verbatim? -- **NO**, all 5 MISSING. Colleague restructured.
-- [ ] Where did the 5 broken paths get remapped to? -- 1590 fuzzy candidates; need filtered re-walk (only those with `Avg Environmental Loading` + bad units)
-- [ ] What are `Kazakhstan_new` (idx 8) and `Kazakhtsan_new2` (idx 9)? -- likely colleague's intermediate snapshots, not investigated. Flag for later.
+- [x] On KAZ_2024 with the right accessor: how many SimType expressions are Network? -- **390 / 390 (every (region, scenario) pair) are `NetworkSimulation(Pipeline)`**
+- [x] Does the area folder contain a beforeCalculation hook with nodal distribution refs? -- **YES**, 19045 bytes / 322 lines at `kaz_workshop exercise\KAZ_2024\beforeCalculation.vbs`, contains both nodal-distribution logic and KAZ_North/West/South references
+- [ ] How many branches under Demand actually have Avg Environmental Loading? (v5 -- next cycle)
+- [ ] Can we read unit metadata (numerator/denominator) via COM? (v5 probe)
+- [ ] Does NetworkSimulation(Pipeline) actually trigger the same nodal-distribution error, or only the SimulationType=NetworkSimulation electricity path? (Day 3 design decision -- if pipeline is benign, maybe only the hook needs neutralizing)
