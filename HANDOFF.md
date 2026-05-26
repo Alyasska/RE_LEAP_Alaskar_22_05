@@ -6,10 +6,11 @@
 
 ## Current state
 
-- **Date:** 2026-05-25
-- **Cycle:** 007 (agent-driven; X01 v2 actually ran Calculate; new error surfaced)
-- **Day in 7-day plan:** 3 / 7 (Calculate now reachable; surface failure mode is unrelated to ISSUE-001 hook)
-- **Hook state:** RESTORED (original beforeCalculation.vbs is back; F01 disable was reversed before X01 v2)
+- **Date:** 2026-05-26
+- **Cycle:** 008 (agent-driven; F03 AreaSettingsINI fix attempted, did NOT unblock; "2010" source is elsewhere)
+- **Day in 7-day plan:** 3 / 7 (Calculate reaches a deterministic year-validation error; need to find the actual source of "2010")
+- **Hook state:** RESTORED (`beforeCalculation.vbs` is the original)
+- **AreaSettings state:** `YearID=2024` and `YearList=2025,2030,2035,2040` (edited from 2010 / 2020,...). Backup at `AreaSettingsINI.txt.bak_cycle008`. Did NOT fix the calc error but is a reasonable, consistent value.
 - **Current `.leap`:** `data/snapshots/cycle_000_colleague_baseline.leap` (KAZ_2024 = index 6)
 - **Hook state:** DISABLED (renamed to `.disabled_cycle005`). Reversible.
 
@@ -23,6 +24,74 @@ Cycle 005 also exposed locale leak in `FormatNumber` -> `0,00`. New project rule
 
 - **001a (hook):** F01 applied. Hook file renamed. Untested.
 - **001b (SimType):** Not touched. Not addressing in cycle 006.
+
+## Last cycle (cycle 008 results, agent-driven) -- 2026-05-26
+
+Hypothesis: stale `YearID=2010` in `AreaSettingsINI.txt` was the source of the "First year parameter (2010)" leak. Tested by backing up the .ini and editing in-place.
+
+### Edit applied (in cycle 008, reversible)
+
+```
+AreaSettingsINI.txt line 237: YearID=2010              -> YearID=2024
+AreaSettingsINI.txt line 251: YearList=2020,2025,2030,2035 -> YearList=2025,2030,2035,2040
+```
+
+Backup at `AreaSettingsINI.txt.bak_cycle008` (11486 bytes, identical to pre-edit). Reversible via `Copy-Item *.bak_cycle008 AreaSettingsINI.txt`.
+
+### Re-tested X01 v2 -- SAME ERROR
+
+| Field | Value |
+|---|---|
+| Wall time | 58.9s (much faster than cycle 007's 557s -- LEAP cold-start cached) |
+| Calc elapsed (LEAP) | **40.96s** (very close to cycle 007's 42.15s -- same code path) |
+| Err.Number | -2147418113 |
+| Err.Description | **`First year parameter (2010) must be within range 2024-2045.`** (identical) |
+
+Same error, same elapsed time → the AreaSettings edit was **not the source**. The "2010" comes from somewhere else.
+
+### Where else "2010" exists in KAZ_2024 folder
+
+```
+ReportINI.txt: 23+ occurrences of YearID=2010 (saved report configs)
+fuels.nx1, masterstructure.nx1, scenarioeffects.nx1, tedeffects.nx1,
+timeslicegroups.nx1, timesliceresults.nx1, tsprofiles.nx1, vintage.nx1,
+oldtedeffects.nx1, OPDebug.txt, years.nx1.bak (NX1 = NexusDB binary)
+```
+
+Most are NexusDB tables (model data) where 2010-era references are expected -- the model has 2010-2024 historical data. The validation error is probably reading a SCALAR setting somewhere, not the data tables.
+
+### Plausible sources still unchecked
+
+1. **`oLEAP.FirstResultsYear`** or similar COM property -- never probed. Could be defaulted to 2010 in-memory and never updated.
+2. **`ReportINI.txt`** with 23+ `YearID=2010` -- each is a saved chart config. Worth a bulk edit if cycle 009 confirms it.
+3. **A scenario-level "From Year" property** -- the cycle 003 audit listed scenario IDs/abbreviations but didn't read individual scenario year ranges.
+4. **NEMO config inside .nx1 tables** -- harder to edit safely.
+
+### Suggested cycle 009 plan (for Claude)
+
+Probe `oLEAP` (opened on KAZ_2024) for First-year-related properties:
+- `oLEAP.FirstResultsYear`
+- `oLEAP.HistoricalFirstYear`
+- `oLEAP.ResultsFirstYear`
+- `oLEAP.StartYear`
+- `oLEAP.MinYear`
+- `oLEAP.FirstYear`
+
+Same Err 438 vs Err 0 vs Err 450 introspection as cycle 006's calc-API probe. Whichever returns a value of `2010` is our culprit. If found, set via COM and re-test.
+
+If no in-memory property holds `2010`, fall back to bulk-editing the 23 `YearID=2010` lines in `ReportINI.txt`. That's a low-risk filesystem edit similar to cycle 008's AreaSettings edit.
+
+### Honest reflection on agent-driven cycles 007-008
+
+The autonomous run produced two cycles in ~30 minutes vs the prior pace of ~1 cycle per planner round-trip. Findings:
+- Cycle 007's "Calculate ran 42s with a new error" was a real diagnostic win.
+- Cycle 008's AreaSettings edit was a reasonable hypothesis, cleanly tested, falsified. No model state corrupted, backup preserved.
+- The next move requires probing COM properties I haven't been asked to write. Stopping here is the right call -- past this point I'd be writing increasingly speculative scripts without Claude's framing.
+
+### Cycle 008 artifacts
+
+- `data/audit_reports/calctest_v2_idx6_20260526_112414.md` + `.data.txt` (the retest result)
+- `AreaSettingsINI.txt` edited in place; `.bak_cycle008` preserved alongside (outside repo, on user's LEAP install)
 
 ## Last cycle (cycle 007 results, agent-driven) -- 2026-05-25
 
