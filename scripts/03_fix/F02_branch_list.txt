@@ -1,0 +1,164 @@
+Key\Agriculture\Agricultural Land in Syr Darya|Activity Level
+Key\Climate\Cooling Degree Days|Activity Level
+Key\Climate\Heating Degree Days|Activity Level
+Key\Demographic\Rural Household Size|Activity Level
+Key\Demographic\Urban Household Size|Activity Level
+Key\Macroeconomic\Gross Domestic Product|Activity Level
+Key\Macroeconomic\Agriculture_Value Added|Activity Level
+Key\Macroeconomic\Commercial_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Chemical and Petrochemical_Value added|Activity Level
+Key\Macroeconomic\Industrial\Construction_Value added|Activity Level
+Key\Macroeconomic\Industrial\Food and Tobacco_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Industry not elsewhere specified_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Iron and Steel_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Machinery_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Mining and quarrying_Value added|Activity Level
+Key\Macroeconomic\Industrial\Non Ferrous Metals_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Non Metallic Minerals_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Paper Pulp and Printing_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Textile and Leather_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Transport Equipment_Value Added|Activity Level
+Key\Macroeconomic\Industrial\Wood and Wood Products_Value Added|Activity Level
+Key\Non Energy\Agriculture\Livestock\Asses|Activity Level
+Key\Non Energy\Agriculture\Livestock\Asses|Liveweight
+Key\Non Energy\Agriculture\Livestock\Mules|Liveweight
+Key\Non Energy\Agriculture\Livestock\Buffalo|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Fraction area Natural Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Forest Land Burnt|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Natural Forest Lands\Shrubland Forest converted to Natural Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Natural Forest Lands\Natural Forest Remaining Natural Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Plantation Forest Lands\Plantation Forest Remaining Planted Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Shrubland Forest Lands\Shrubland Forest remaining Shrubland Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Shrubland Forest Lands\Shrubland Forest remaining Shrubland Forest|Area Converted Last 20 yrs
+Key\Non Energy\LULUCF\Forested Lands\Shrubland Forest Lands\Natural forest converted to Shrubland Forest|Activity Level
+Key\Non Energy\LULUCF\Forested Lands\Shrubland Forest Lands\Cropland converted to Shrubland Forest|Activity Level
+Key\Non Energy\LULUCF\Croplands\Cropland_assumed conventional cultivation\Shrubland forests converted to Croplands|Activity Level
+Key\Non Energy\LULUCF\Croplands\Cropland_assumed conventional cultivation\Grassland converted to Cropland|Activity Level
+Key\Non Energy\LULUCF\Croplands\Cropland_assumed conventional cultivation\Other land converted to Cropland|Activity Level
+Key\Non Energy\LULUCF\Grasslands\Other land converted to Grassland_pastures|Activity Level
+Key\Non Energy\LULUCF\Grasslands\Wetlands converted to Grasslands_pastures|Activity Level
+Key\Non Energy\LULUCF\Wetlands\Wetlands remaining Wetlands|Activity Level
+Key\Non Energy\LULUCF\Wetlands\Lands converted to Wetlands|Activity Level
+Key\Non Energy\LULUCF\Settlements\Croplands converted to Settlements|Activity Level
+Key\Non Energy\LULUCF\Settlements\Grassland converted to Settlements|Activity Level
+Key\Non Energy\LULUCF\Settlements\Other Land converted to Settlements|Activity Level
+Key\Non Energy\LULUCF\Other Lands\Plantation Forest converted to Other Land|Activity Level
+Key\Non Energy\LULUCF\Other Lands\Cropland converted to Other Land|Activity Level
+Key\Non Energy\LULUCF\Other Lands\Grassland converted to Other Land|Activity Level
+Demand\Residential\Top down\Rural\Electricity|Historical_Demand
+Demand\Residential\Top down\Rural\Residual Fuel Oil|Historical_Demand
+Demand\Industry\Non Ferrous Metals\Top down\Coal Bituminous|Historical_Demand
+Demand\Industry\Non Ferrous Metals\Top down\Coal Lignite|Historical_Demand
+Demand\Industry\Non Ferrous Metals\Top down\Diesel|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Bitumen|Historical_Demand
+Demand\Commercial\Bitumen|Historical_Demand
+Demand\Commercial\Lubricants|Historical_Demand
+Demand\Commercial\LPG|Historical_Demand
+Demand\Commercial\Natural Gas|Historical_Demand
+Demand\Commercial\Petroleum Coke|Historical_Demand
+Demand\Commercial\Residual Fuel Oil|Historical_Demand
+Demand\Commercial\Biomass|Historical_Demand
+Demand\Transport\Rail\Coal Bituminous|Historical_Demand
+Demand\Transport\Rail\Coal Lignite|Historical_Demand
+Demand\Transport\Rail\Metallurgical Coke|Historical_Demand
+Demand\Transport\Rail\Residual Fuel Oil|Historical_Demand
+Demand\Transport\Rail\Kerosene|Historical_Demand
+Demand\Transport\Domestic Navigation\Coal Lignite|Historical_Demand
+Demand\Transport\Domestic Navigation\Diesel|Historical_Demand
+Demand\Transport\Domestic Navigation\Lubricants|Historical_Demand
+Demand\Transport\Domestic Navigation\Metallurgical Coke|Historical_Demand
+Demand\Transport\Domestic Aviation\Avgas|Historical_Demand
+Demand\Transport\Domestic Aviation\Jet Kerosene|Historical_Demand
+Demand\Transport\Pipeline\Bitumen|Historical_Demand
+Demand\Transport\Pipeline\Crude Oil|Historical_Demand
+Demand\Transport\Pipeline\Diesel|Historical_Demand
+Demand\Transport\Pipeline\Electricity|Historical_Demand
+Demand\Commercial\Coal Anthracite|Historical_Demand
+Demand\Commercial\Coal Bituminous|Historical_Demand
+Demand\Commercial\Coal Lignite|Historical_Demand
+Demand\Commercial\Diesel|Historical_Demand
+Demand\Commercial\Electricity|Historical_Demand
+Demand\Commercial\Heat|Historical_Demand
+Demand\Commercial\Jet Kerosene|Historical_Demand
+Demand\Commercial\Gasoline|Historical_Demand
+Demand\Commercial\Kerosene|Historical_Demand
+Demand\Transport\Road\Bitumen|Historical_Demand
+Demand\Transport\Road\Diesel|Historical_Demand
+Demand\Transport\Road\Gasoline|Historical_Demand
+Demand\Transport\Road\Lubricants|Historical_Demand
+Demand\Transport\Road\Natural Gas|Historical_Demand
+Demand\Transport\Road\Electricity|Historical_Demand
+Demand\Transport\Road\LPG|Historical_Demand
+Demand\Transport\Rail\Diesel|Historical_Demand
+Demand\Transport\Rail\Gasoline|Historical_Demand
+Demand\Transport\Rail\Lubricants|Historical_Demand
+Demand\Transport\Rail\Electricity|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Metallurgical Coke|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Residual Fuel Oil|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\LPG|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Kerosene|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Coal Bituminous|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Gasoline|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Electricity|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Diesel|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Heat|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Coal Anthracite|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\LPG|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Natural Gas|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Residual Fuel Oil|Historical_Demand
+Demand\Industry\Textile and Leather\Electricity|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Kerosene|Historical_Demand
+Demand\Industry\Textile and Leather\Coal Lignite|Historical_Demand
+Demand\Industry\Textile and Leather\Diesel|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Natural Gas|Historical_Demand
+Demand\Industry\Paper Pulp and Printing\Coal Lignite|Historical_Demand
+Demand\Industry\Textile and Leather\Coal Bituminous|Historical_Demand
+Demand\Industry\Textile and Leather\Natural Gas|Historical_Demand
+Demand\Industry\Textile and Leather\Residual Fuel Oil|Historical_Demand
+Demand\Industry\Textile and Leather\Gasoline|Historical_Demand
+Demand\Residential\Top down\Rural\Petroleum Coke|Historical_Demand
+Demand\Industry\Mining and Quarrying\Top down\Natural Gas|Historical_Demand
+Demand\Industry\Mining and Quarrying\Top down\Petroleum Coke|Historical_Demand
+Demand\Industry\Mining and Quarrying\Top down\Residual Fuel Oil|Historical_Demand
+Demand\Residential\Top down\Urban\Electricity|Historical_Demand
+Demand\Residential\Top down\Urban\Gasoline|Historical_Demand
+Demand\Residential\Top down\Urban\Diesel|Historical_Demand
+Demand\Residential\Top down\Rural\Coal Anthracite|Historical_Demand
+Demand\Residential\Top down\Rural\Natural Gas|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Electricity|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Heat|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\LPG|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Lubricants|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Metallurgical Coke|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Natural Gas|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Petroleum Coke|Historical_Demand
+Demand\Residential\Top down\Rural\Diesel|Historical_Demand
+Demand\Residential\Top down\Rural\Coal Lignite|Historical_Demand
+Demand\Industry\Other\Top Down\All Other\Coal Anthracite|Historical_Demand
+Demand\Industry\Other\Top Down\All Other\Crude Oil|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Coal Bituminous|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Coal Lignite|Historical_Demand
+Demand\Industry\Iron and Steel\Top down\Diesel|Historical_Demand
+Demand\Industry\Textile and Leather\Kerosene|Historical_Demand
+Demand\Industry\Textile and Leather\Oil|Historical_Demand
+Demand\Industry\Transport Equipment\Coal Bituminous|Historical_Demand
+Demand\Industry\Transport Equipment\Diesel|Historical_Demand
+Demand\Industry\Transport Equipment\Heat|Historical_Demand
+Demand\Industry\Transport Equipment\Electricity|Historical_Demand
+Demand\Industry\Transport Equipment\LPG|Historical_Demand
+Demand\Industry\Transport Equipment\Natural Gas|Historical_Demand
+Demand\Industry\Transport Equipment\Kerosene|Historical_Demand
+Demand\Industry\Transport Equipment\Residual Fuel Oil|Historical_Demand
+Demand\Industry\Transport Equipment\Coal Lignite|Historical_Demand
+Demand\Industry\Transport Equipment\Metallurgical Coke|Historical_Demand
+Demand\Industry\Machinery\Coal Lignite|Historical_Demand
+Demand\Industry\Wood and Wood Products\Coal Bituminous|Historical_Demand
+Demand\Industry\Wood and Wood Products\Diesel|Historical_Demand
+Demand\Industry\Wood and Wood Products\Electricity|Historical_Demand
+Demand\Industry\Wood and Wood Products\Natural Gas|Historical_Demand
+Demand\Industry\Wood and Wood Products\Heat|Historical_Demand
+Demand\Industry\Wood and Wood Products\Gasoline|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Electricity|Historical_Demand
+Demand\Industry\Non Ferrous Metals\Top down\Bitumen|Historical_Demand
+Demand\Industry\Textile and Leather\Heat|Historical_Demand
+Demand\Industry\Non Metallic Minerals\Top down\Coal Bituminous|Historical_Demand
